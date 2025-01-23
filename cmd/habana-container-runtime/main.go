@@ -57,7 +57,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logFile, err := os.OpenFile(cfg.Runtime.DebugFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(cfg.Runtime.DebugFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
@@ -148,7 +148,7 @@ func handleRequest(logger *slog.Logger, cfg *config.Config, args []string) error
 	// We get the available devices based on the user request. If requested device is not
 	// available, we'll return here and log the info. If the options is 'all' or not set,
 	// we get all the devices.
-	requestedDevices := discover.DevicesIDs(filterDevicesByENV(specConfig, discover.AcceleratorDevices()))
+	requestedDevices := discover.DevicesIDs(filterDevicesByENV(specConfig, discover.AcceleratorDevices(), discover.ModuleIDToDevIDs()))
 	if len(requestedDevices) == 0 {
 		logger.Info("No habanalabs accelerators found")
 		return nil
@@ -228,6 +228,9 @@ func hasCreateCommand(args []string) bool {
 func IsHabanaContainer(spec *specs.Spec) bool {
 	for _, ev := range spec.Process.Env {
 		if strings.HasPrefix(ev, EnvHLVisibleDevices) {
+			return true
+		}
+		if strings.HasPrefix(ev, EnvHLVisibleModules) {
 			return true
 		}
 	}

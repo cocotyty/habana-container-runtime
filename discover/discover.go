@@ -141,6 +141,29 @@ func AcceleratorModuleID(acceleratorID string) (string, error) {
 	return strings.TrimSpace(string(content)), nil
 }
 
+func ModuleIDToDevIDs() map[string]string {
+	devices := AcceleratorDevices()
+	if len(devices) == 0 {
+		return map[string]string{}
+	}
+
+	moduleIDToDevID := make(map[string]string)
+
+	for _, device := range devices {
+		devID := string(device[len(device)-1])
+		moduleID, err := AcceleratorModuleID(devID)
+		if err != nil {
+			continue
+		}
+
+		if moduleID != "" {
+			moduleIDToDevID[moduleID] = devID
+		}
+	}
+
+	return moduleIDToDevID
+}
+
 type DevInfo struct {
 	Path     string
 	Major    uint32

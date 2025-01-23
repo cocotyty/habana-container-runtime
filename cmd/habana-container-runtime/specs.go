@@ -32,7 +32,7 @@ import (
 )
 
 func loadSpecs(bundleConfigFile string) (*specs.Spec, error) {
-	jsonFile, err := os.OpenFile(filepath.Clean(bundleConfigFile), os.O_RDWR, 0644)
+	jsonFile, err := os.OpenFile(filepath.Clean(bundleConfigFile), os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("opening OCI spec file: %w", err)
 	}
@@ -48,7 +48,7 @@ func loadSpecs(bundleConfigFile string) (*specs.Spec, error) {
 }
 
 func saveSpecs(bundleConfigFile string, spec *specs.Spec) error {
-	jsonFile, err := os.OpenFile(filepath.Clean(bundleConfigFile), os.O_RDWR, 0644)
+	jsonFile, err := os.OpenFile(filepath.Clean(bundleConfigFile), os.O_RDWR, 0o644)
 	if err != nil {
 		return fmt.Errorf("opening OCI spec file: %w", err)
 	}
@@ -206,19 +206,47 @@ func addUverbsDevices(logger *slog.Logger, spec *specs.Spec, requestedDevsIDs []
 	return nil
 }
 
-func filterDevicesByENV(spec *specs.Spec, devices []string) []string {
+func filterDevicesByENV(spec *specs.Spec, devices []string, modules2ids map[string]string) []string {
 	var requestedDevs []string
-	for _, ev := range spec.Process.Env {
+	devicesIsAll := false
+	devicesEvIndex := -1
+	for i, ev := range spec.Process.Env {
 		if strings.HasPrefix(ev, "HABANA_VISIBLE_DEVICES") {
 			_, values, found := strings.Cut(ev, "=")
 			if found {
 				if values == "all" {
-					return devices
+					devicesIsAll = true
+					devicesEvIndex = i
 				} else {
 					requestedDevs = strings.Split(values, ",")
 				}
 			}
 			break
+		}
+	}
+	if len(requestedDevs) == 0 || devicesIsAll {
+		for _, ev := range spec.Process.Env {
+			if strings.HasPrefix(ev, "HABANA_VISIBLE_MODULES") {
+				_, values, found := strings.Cut(ev, "=")
+				if !found {
+					continue
+				}
+				if values == "all" {
+					devicesIsAll = true
+					break
+				}
+				for _, moduleID := range strings.Split(values, ",") {
+					if id, ok := modules2ids[moduleID]; ok {
+						requestedDevs = append(requestedDevs, id)
+					}
+				}
+				newDevicesIDEnv := "HABANA_VISIBLE_DEVICES=" + strings.Join(requestedDevs, ",")
+				if devicesEvIndex != -1 {
+					spec.Process.Env[devicesEvIndex] = newDevicesIDEnv
+				} else {
+					spec.Process.Env = append(spec.Process.Env, newDevicesIDEnv)
+				}
+			}
 		}
 	}
 
